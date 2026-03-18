@@ -68,6 +68,10 @@ interface AuthResponse {
   expires_in?: number;
 }
 
+interface EnrollResponse {
+  agent_id: string;
+}
+
 interface InspectResult {
   score: number;
   safe: boolean;
@@ -189,6 +193,73 @@ async function getToken(cfg: OneclawConfig): Promise<string> {
   _tokenExpiry = Date.now() + (data.expires_in ?? 300) * 1000;
 
   return token;
+}
+
+// ── Enroll (no auth required) ──────────────────────────────────────────────
+
+/**
+ * `openclaw 1claw enroll [--email <email>] [--name <name>]`
+ * Self-enroll with 1claw: creates an agent, API key is emailed to the human.
+ * Use when ONECLAW_AGENT_ID / ONECLAW_API_KEY are not set.
+ * See https://docs.1claw.xyz/docs/guides/agent-self-onboarding
+ */
+async function cmdEnroll(ctx: PluginContext, args: string[]): Promise<void> {
+  const baseUrl = process.env.ONECLAW_BASE_URL ?? "https://api.1claw.xyz";
+  let humanEmail = process.env.ONECLAW_HUMAN_EMAIL ?? "";
+  let agentName = process.env.ONECLAW_AGENT_NAME ?? "my-assistant";
+  let description = "NemoClaw / OpenShell sandbox agent";
+
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--email" && args[i + 1]) {
+      humanEmail = args[++i];
+    } else if (args[i] === "--name" && args[i + 1]) {
+      agentName = args[++i];
+    } else if (args[i] === "--description" && args[i + 1]) {
+      description = args[++i];
+    } else if (!args[i].startsWith("--") && !humanEmail) {
+      humanEmail = args[i];
+    }
+  }
+
+  if (!humanEmail) {
+    ctx.error(
+      "Human email is required.\n" +
+      "  openclaw 1claw enroll --email you@example.com\n" +
+      "  or set ONECLAW_HUMAN_EMAIL and run: openclaw 1claw enroll"
+    );
+    ctx.exit(1);
+  }
+
+  ctx.log("Enrolling agent with 1claw (API key will be emailed to the human)…\n");
+
+  const res = await fetch(`${baseUrl}/v1/agents/enroll`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: agentName,
+      human_email: humanEmail,
+      description,
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    ctx.error(`Enroll failed (${res.status}): ${text}`);
+    ctx.exit(1);
+  }
+
+  const data = (await res.json()) as EnrollResponse;
+  const agentId = data.agent_id;
+
+  ctx.log(`✓ Agent enrolled. Agent ID: ${agentId}\n`);
+  ctx.log("Next steps:");
+  ctx.log("  1. Check the inbox for " + humanEmail + " for the API key (ocv_…).");
+  ctx.log("  2. In the 1claw dashboard, create or select a vault and add a policy for this agent.");
+  ctx.log("  3. Set in this environment:");
+  ctx.log(`     export ONECLAW_AGENT_ID="${agentId}"`);
+  ctx.log("     export ONECLAW_API_KEY=\"ocv_...\"   # from the email");
+  ctx.log("     export ONECLAW_VAULT_ID=\"<your-vault-id>\"");
+  ctx.log("  4. Run: openclaw 1claw status");
 }
 
 // ── Command handlers ──────────────────────────────────────────────────────
@@ -448,6 +519,14 @@ const oneclawPlugin: OpenClawPlugin = {
 
   commands: {
 
+    enroll: {
+      description: "Self-enroll with 1claw (no credentials). API key is emailed to the human.",
+      usage: "openclaw 1claw enroll --email <email> [--name <agent-name>]",
+      async handler(args, ctx) {
+        await cmdEnroll(ctx, args);
+      },
+    },
+
     status: {
       description: "Check connectivity to the 1claw vault API and MCP server.",
       usage: "openclaw 1claw status",
@@ -546,6 +625,8 @@ const oneclawPlugin: OpenClawPlugin = {
         ctx.log("  ONECLAW_AGENT_ID    agent identity");
         ctx.log("  ONECLAW_API_KEY     agent API key (ocv_…)");
         ctx.log("  ONECLAW_TOKEN       static JWT (skips auth exchange)");
+        ctx.log("  ONECLAW_HUMAN_EMAIL for enroll: email to receive API key");
+        ctx.log("  ONECLAW_AGENT_NAME  for enroll: agent name (default: my-assistant)");
         ctx.log("  ONECLAW_BASE_URL    API base URL override");
         ctx.log("  ONECLAW_MCP_URL     MCP server URL override");
         ctx.log("  ONECLAW_USE_SHROUD  true to route LLM traffic through Shroud");

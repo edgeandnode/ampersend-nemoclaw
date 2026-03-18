@@ -69,7 +69,9 @@ nemoclaw my-assistant connect
 
 ### 1.5 Use 1claw in the sandbox
 
-You’re now inside the sandbox. Set 1claw env vars and run the agent:
+You’re now inside the sandbox.
+
+**If you already have 1claw credentials** (vault, agent, API key), set them and run:
 
 ```bash
 export ONECLAW_VAULT_ID="your-vault-id"
@@ -78,6 +80,12 @@ export ONECLAW_API_KEY="ocv_..."
 openclaw 1claw status
 openclaw tui
 ```
+
+**If you don’t have credentials yet (agent self-onboarding):** the agent can self-enroll with 1claw; the API key is emailed to you. Either:
+
+- **During setup:** set `ONECLAW_HUMAN_EMAIL=you@example.com` in `.env` (leave `ONECLAW_AGENT_ID` and `ONECLAW_API_KEY` empty) before running `npm run setup:docker`. The setup script will call the [enroll API](https://docs.1claw.xyz/docs/guides/agent-self-onboarding); check your email for the key, then create a vault and policy in the 1claw dashboard and set the three env vars above.
+
+- **Inside the sandbox:** run `openclaw 1claw enroll --email you@example.com`. Follow the printed steps: check email, create vault and policy in the dashboard, then `export ONECLAW_AGENT_ID=... ONECLAW_API_KEY=... ONECLAW_VAULT_ID=...`.
 
 `openclaw tui` is the chat UI. This repo is mounted at `/workspace/1claw-nemoclaw`.
 
@@ -216,7 +224,7 @@ If you want to run `nemoclaw my-assistant connect` from the Mac instead of `dock
 
 | Command | Description |
 |--------|-------------|
-| `npm run setup:docker` | One-shot: install, gateway, create sandbox, apply 1claw policy, install 1claw plugin, and install skills from `config/skills-to-install.txt` (requires `NVIDIA_API_KEY` in `.env`). |
+| `npm run setup:docker` | One-shot: install, gateway, create sandbox, apply 1claw policy, optional 1claw agent self-enroll (if `ONECLAW_HUMAN_EMAIL` set), install 1claw plugin, and skills from `config/skills-to-install.txt` (requires `NVIDIA_API_KEY` in `.env`). |
 | `npm run plugin:upload` | Upload the 1claw plugin bundle to the sandbox (then in sandbox run `openclaw plugins install /sandbox/1claw-plugin`). |
 | `npm run nemoclaw:interactive` | Start an interactive Docker shell for manual NemoClaw steps. |
 | `npm test` | Run tests (policy, blueprint, plugin). |

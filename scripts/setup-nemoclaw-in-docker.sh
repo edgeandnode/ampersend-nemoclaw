@@ -41,22 +41,24 @@ docker run --rm \
   -e "ONECLAW_VAULT_ID=${ONECLAW_VAULT_ID:-}" \
   -e "ONECLAW_AGENT_ID=${ONECLAW_AGENT_ID:-}" \
   -e "ONECLAW_API_KEY=${ONECLAW_API_KEY:-}" \
+  -e "ONECLAW_HUMAN_EMAIL=${ONECLAW_HUMAN_EMAIL:-}" \
+  -e "ONECLAW_AGENT_NAME=${ONECLAW_AGENT_NAME:-}" \
   -w /workspace \
   ubuntu:24.04 \
   bash -c '
     set -e
     export DEBIAN_FRONTEND=noninteractive
-    echo "[1/7] Installing system deps..."
+    echo "[1/8] Installing system deps..."
     apt-get update -qq && apt-get install -y -qq curl git ca-certificates docker.io > /dev/null
 
-    echo "[2/7] Installing OpenShell and Node..."
+    echo "[2/8] Installing OpenShell and Node..."
     curl -LsSf https://astral.sh/uv/install.sh | sh
     export PATH="$HOME/.local/bin:$PATH"
     uv tool install -U openshell
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - > /dev/null 2>&1
     apt-get install -y -qq nodejs > /dev/null
 
-    echo "[3/7] Installing NemoClaw..."
+    echo "[3/8] Installing NemoClaw..."
     if [[ ! -d /workspace/NemoClaw ]]; then
       git clone --depth 1 https://github.com/NVIDIA/NemoClaw.git /workspace/NemoClaw 2>/dev/null || true
     fi
@@ -66,7 +68,7 @@ docker run --rm \
       cd /workspace
     fi
 
-    echo "[4/7] Saving NemoClaw credentials and registering gateway..."
+    echo "[4/8] Saving NemoClaw credentials and registering gateway..."
     mkdir -p /root/.nemoclaw
     echo "{\"NVIDIA_API_KEY\":\"$NVIDIA_API_KEY\"}" > /root/.nemoclaw/credentials.json
     chmod 600 /root/.nemoclaw/credentials.json 2>/dev/null || true
@@ -89,7 +91,7 @@ docker run --rm \
       exit 1
     fi
 
-    echo "[5/7] Creating sandbox $SANDBOX_NAME (from openclaw community image)..."
+    echo "[5/8] Creating sandbox $SANDBOX_NAME (from openclaw community image)..."
     if openshell sandbox list 2>/dev/null | grep -q "$SANDBOX_NAME"; then
       echo "  Sandbox $SANDBOX_NAME already exists."
     else
@@ -97,7 +99,27 @@ docker run --rm \
       openshell policy set --policy /workspace/1claw-nemoclaw/config/1claw-openshell-policy.yaml "$SANDBOX_NAME" 2>/dev/null || true
     fi
 
-    echo "[6/7] Uploading and installing 1claw plugin..."
+    echo "[6/8] 1claw agent self-enroll (optional)..."
+    if [[ -z "$ONECLAW_AGENT_ID" && -z "$ONECLAW_API_KEY" && -n "$ONECLAW_HUMAN_EMAIL" ]]; then
+      ENROLL_NAME="${ONECLAW_AGENT_NAME:-$SANDBOX_NAME}"
+      ENROLL_RESP=$(curl -s -X POST "https://api.1claw.xyz/v1/agents/enroll" \
+        -H "Content-Type: application/json" \
+        -d "{\"name\":\"$ENROLL_NAME\",\"human_email\":\"$ONECLAW_HUMAN_EMAIL\",\"description\":\"NemoClaw sandbox agent\"}" 2>/dev/null) || true
+      if echo "$ENROLL_RESP" | grep -q "agent_id"; then
+        ENROLL_AGENT_ID=$(echo "$ENROLL_RESP" | sed -n "s/.*\"agent_id\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" | head -1)
+        echo "  Agent enrolled. Agent ID: $ENROLL_AGENT_ID"
+        echo "  Check $ONECLAW_HUMAN_EMAIL for the API key. Then in the 1claw dashboard create a vault, add a policy for this agent, and set:"
+        echo "    export ONECLAW_AGENT_ID=\"$ENROLL_AGENT_ID\""
+        echo "    export ONECLAW_API_KEY=\"ocv_...\""
+        echo "    export ONECLAW_VAULT_ID=\"<vault-id>\""
+      else
+        echo "  (Enroll failed or rate-limited; run \"openclaw 1claw enroll --email $ONECLAW_HUMAN_EMAIL\" inside the sandbox later.)"
+      fi
+    else
+      echo "  (Set ONECLAW_HUMAN_EMAIL in .env to self-enroll when ONECLAW_AGENT_ID/ONECLAW_API_KEY are not set.)"
+    fi
+
+    echo "[7/8] Uploading and installing 1claw plugin..."
     if [[ -d /workspace/1claw-nemoclaw/config/1claw-plugin ]]; then
       openshell sandbox upload "$SANDBOX_NAME" /workspace/1claw-nemoclaw/config/1claw-plugin /sandbox/1claw-plugin 2>/dev/null || true
       printf "openclaw plugins install /sandbox/1claw-plugin 2>/dev/null; exit\n" | openshell sandbox connect "$SANDBOX_NAME" 2>/dev/null || true
@@ -106,7 +128,7 @@ docker run --rm \
       echo "  (config/1claw-plugin not found; skip plugin install)"
     fi
 
-    echo "[7/7] Installing OpenClaw skills (from config/skills-to-install.txt)..."
+    echo "[8/8] Installing OpenClaw skills (from config/skills-to-install.txt)..."
     SKILLS_FILE="/workspace/1claw-nemoclaw/config/skills-to-install.txt"
     if [[ -f "$SKILLS_FILE" ]]; then
       SKILL_CMDS=""
