@@ -138,13 +138,18 @@ docker run --rm \
       openshell policy set --policy /workspace/1claw-nemoclaw/config/1claw-openshell-policy.yaml "$SANDBOX_NAME" 2>/dev/null || true
     fi
 
-    echo "[7/8] Uploading and installing 1claw plugin..."
-    if [[ -d /workspace/1claw-nemoclaw/config/1claw-plugin ]]; then
-      openshell sandbox upload "$SANDBOX_NAME" /workspace/1claw-nemoclaw/config/1claw-plugin /sandbox/1claw-plugin 2>/dev/null || true
+    echo "[7/8] Cloning, building, and installing 1claw plugin..."
+    PLUGIN_DIR="/workspace/1claw-plugin"
+    if git clone --depth 1 https://github.com/1clawAI/1claw-openclaw-plugin.git "$PLUGIN_DIR" 2>/dev/null; then
+      cd "$PLUGIN_DIR"
+      npm install --production 2>/dev/null
+      rm -f .gitignore  # so openshell upload includes node_modules
+      cd /workspace
+      openshell sandbox upload "$SANDBOX_NAME" "$PLUGIN_DIR" /sandbox/1claw-plugin 2>/dev/null || true
       printf "openclaw plugins install /sandbox/1claw-plugin 2>/dev/null; exit\n" | openshell sandbox connect "$SANDBOX_NAME" 2>/dev/null || true
-      echo "  1claw plugin uploaded and installed."
+      echo "  1claw plugin cloned, built, and installed."
     else
-      echo "  (config/1claw-plugin not found; skip plugin install)"
+      echo "  (Failed to clone 1claw-openclaw-plugin; install manually later — see README.)"
     fi
 
     echo "[8/8] Installing OpenClaw skills (from config/skills-to-install.txt)..."

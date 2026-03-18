@@ -41,6 +41,9 @@ out/
 .DS_Store
 Thumbs.db
 
+# Plugin cache (cloned upstream plugin with deps)
+.cache/
+
 # Logs and temp
 *.log
 npm-debug.log*

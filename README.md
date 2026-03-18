@@ -133,7 +133,7 @@ npm run plugin:upload
 **Then connect to the sandbox** and install the plugin:
 
 ```bash
-openshell sandbox connect my-assistant
+npm run connect
 # Inside the sandbox:
 openclaw plugins install /sandbox/1claw-plugin
 export ONECLAW_VAULT_ID="your-vault-id"
@@ -142,7 +142,7 @@ export ONECLAW_API_KEY="ocv_..."
 openclaw 1claw status
 ```
 
-If `openclaw plugins install` is not available or fails in your OpenClaw version, copy the plugin file into the sandbox and register it in OpenClaw config (see [scripts/README-TESTING.md](scripts/README-TESTING.md)).
+The plugin is the upstream [1claw-openclaw-plugin](https://github.com/1clawAI/1claw-openclaw-plugin). The upload script clones it, runs `npm install` (sandbox has no npm registry access), and uploads with `node_modules` included.
 
 ### 1.7 Auto-install OpenClaw skills
 
@@ -244,8 +244,8 @@ If you want to run `nemoclaw my-assistant connect` from the Mac instead of `dock
 | Path | Description |
 |------|-------------|
 | **config/1claw-openshell-policy.yaml** | OpenShell policy (1claw, NVIDIA, npm, GitHub). |
-| **config/openclaw-1claw-plugin.ts** | OpenClaw plugin: `openclaw 1claw status`, `ls`, `fetch`, `put`, `rm`, etc. |
 | **config/nemoclaw-1claw-blueprint.py** | Blueprint to apply 1claw policy to a sandbox. |
+| [1claw-openclaw-plugin](https://github.com/1clawAI/1claw-openclaw-plugin) | OpenClaw plugin (cloned at setup time): `openclaw 1claw status`, `ls`, `fetch`, `put`, `rm`, etc. |
 
 ---
 
@@ -264,7 +264,7 @@ If you want to run `nemoclaw my-assistant connect` from the Mac instead of `dock
 | `npm run gateway:start` | Start the OpenShell plaintext gateway. Uses native CLI if available, otherwise runs in Docker (works on Intel Macs). |
 | `npm run setup:docker` | One-shot: install, gateway, create sandbox, apply 1claw policy, optional 1claw agent self-enroll (if `ONECLAW_HUMAN_EMAIL` set), install 1claw plugin, and skills from `config/skills-to-install.txt` (requires `NVIDIA_API_KEY` in `.env`). |
 | `npm run connect` | Connect to the sandbox from your Mac. Uses `openshell sandbox connect` (natively or via Docker). |
-| `npm run plugin:upload` | Upload the 1claw plugin bundle to the sandbox (then in sandbox run `openclaw plugins install /sandbox/1claw-plugin`). |
+| `npm run plugin:upload` | Clone the [upstream 1claw plugin](https://github.com/1clawAI/1claw-openclaw-plugin), install deps, and upload to the sandbox (then in sandbox run `openclaw plugins install /sandbox/1claw-plugin`). |
 | `npm run nemoclaw:interactive` | Start an interactive Docker shell for manual NemoClaw steps. |
 | `npm test` | Run tests (policy, blueprint, plugin). |
 
