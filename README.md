@@ -101,6 +101,47 @@ The 1claw plugin registers TUI slash commands: `/oneclaw` (status), `/oneclaw-en
 
 ---
 
+## Ampersend setup (agent payments)
+
+[Ampersend](https://clawhub.ai/matiasedgeandnode/ampersend) lets agents make payments via smart account wallets with automatic [x402](https://www.x402.org/) payment handling. It is bundled as a skill in the 1claw plugin.
+
+### Install the CLI (inside the sandbox)
+
+```bash
+npm install -g @ampersend_ai/ampersend-sdk@beta
+```
+
+### Configure
+
+```bash
+# 1. Initialize — generates a session key
+ampersend config init
+# Returns: {"ok": true, "data": {"sessionKeyAddress": "0x...", "status": "pending_agent"}}
+
+# 2. Register the sessionKeyAddress in the Ampersend dashboard
+
+# 3. Link your smart account
+ampersend config set-agent <SMART_ACCOUNT_ADDRESS>
+
+# 4. Verify
+ampersend config status
+# Returns: {"ok": true, "data": {"status": "ready", ...}}
+```
+
+### Usage
+
+```bash
+# GET request with automatic x402 payment
+ampersend fetch <url>
+
+# POST with headers and body
+ampersend fetch -X POST -H "Content-Type: application/json" -d '{"key":"value"}' <url>
+```
+
+All commands return JSON — check the `ok` field. For `fetch`, successful responses include `data.status`, `data.body`, and `data.payment` (when a payment was made).
+
+---
+
 ## Manual setup (alternative to quick start)
 
 If you prefer to run each step manually instead of `npm run setup:docker`:
