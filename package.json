@@ -9,11 +9,8 @@
     "test:1claw": "bash scripts/test-1claw-api.sh",
     "test:blueprint": "bash scripts/test-blueprint.sh",
     "test:plugin": "node scripts/test-plugin-runner.mjs",
-    "test:plugin:status": "node scripts/test-plugin-runner.mjs status",
-    "test:plugin:help": "node scripts/test-plugin-runner.mjs help",
-    "spin-up": "bash scripts/spin-up-nemoclaw.sh",
-    "do-it-all": "bash scripts/do-it-all.sh",
-    "do-it-all:docker": "bash scripts/do-it-all-docker.sh",
+    "setup:docker": "bash scripts/setup-nemoclaw-in-docker.sh",
+    "plugin:upload": "bash scripts/upload-1claw-plugin-to-sandbox.sh",
     "nemoclaw:interactive": "bash scripts/nemoclaw-interactive.sh"
   },
   "devDependencies": {

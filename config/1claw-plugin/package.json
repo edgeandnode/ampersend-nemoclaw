@@ -1,0 +1,8 @@
+{
+  "name": "1claw-openclaw-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "openclaw": {
+    "extensions": ["./openclaw-1claw-plugin.ts"]
+  }
+}

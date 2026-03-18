@@ -38,13 +38,18 @@ echo "=============================================="
 echo "  Repo:      $REPO_ROOT -> /workspace/1claw-nemoclaw"
 echo "  Sandbox:   $SANDBOX_NAME"
 echo ""
-echo "  First time: run  nemoclaw setup   (prompts for NVIDIA API key)"
+echo "  First time: run  nemoclaw onboard   (or nemoclaw setup; prompts for NVIDIA API key)"
 echo "  Then:       run  nemoclaw $SANDBOX_NAME connect"
 echo "  In sandbox: run  openclaw 1claw status   or   openclaw tui"
+echo ""
+echo "  If gateway fails: on your Mac run  nemoclaw setup-spark  (or in Docker Desktop"
+echo "  add  \"default-cgroupns-mode\": \"host\"  to daemon.json and restart Docker)."
 echo "=============================================="
 echo ""
 
+# OpenShell gateway needs host cgroup namespace (k3s inside Docker)
 docker run --rm -it \
+  --cgroupns=host \
   -v "/var/run/docker.sock:/var/run/docker.sock" \
   -v "$REPO_ROOT:/workspace/1claw-nemoclaw:ro" \
   -e "SANDBOX_NAME=$SANDBOX_NAME" \
@@ -74,8 +79,14 @@ docker run --rm -it \
       cd /workspace
     fi
 
+    # Gateway runs on the host (Docker socket). From inside this container, point CLI at the host.
+    export OPENSHELL_GATEWAY_ENDPOINT=https://host.docker.internal:8080
+    openshell gateway add https://host.docker.internal:8080 --local 2>/dev/null || true
+
     echo ""
-    echo "Ready. Run:  nemoclaw setup   (first time) then  nemoclaw '"$SANDBOX_NAME"' connect"
+    echo "Ready. Gateway URL set to host (https://host.docker.internal:8080)."
+    echo "  List sandboxes:  openshell sandbox list"
+    echo "  Connect:         nemoclaw connect '"$SANDBOX_NAME"'   (or  nemoclaw '"$SANDBOX_NAME"' connect)"
     echo ""
     exec bash
   '

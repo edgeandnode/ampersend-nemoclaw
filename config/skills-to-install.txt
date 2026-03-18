@@ -1,0 +1,6 @@
+# OpenClaw skills to install automatically during setup:docker
+# One skill name per line (from ClawHub). Lines starting with # are ignored.
+# Example: clawhub install <name> is run for each line.
+#
+# github
+# docker-essentials

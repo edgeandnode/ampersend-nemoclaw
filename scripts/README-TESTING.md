@@ -4,23 +4,24 @@ This guide walks through testing all three integration pieces **without** requir
 
 ---
 
-## Do it all (one command)
+## Run tests (local)
 
 From repo root:
 
 ```bash
-npm run do-it-all
+npm test
 ```
 
-This runs: policy validation, blueprint dry-run (if `ONECLAW_*` set), plugin help/status, spin-up if OpenShell/NemoClaw are installed, and prints how to run the full stack in Docker.
+This runs: policy validation, blueprint dry-run (if `ONECLAW_*` set), and plugin status.
 
-To run the **full stack in Docker** (Ubuntu + OpenShell + NemoClaw + 1claw policy) on your Mac:
+To run the **full setup in Docker** (create sandbox, install 1claw plugin and optional skills) on your Mac:
 
 ```bash
-npm run do-it-all:docker
+openshell gateway start --plaintext   # on Mac, one-time
+npm run setup:docker
 ```
 
-The first run pulls Ubuntu 24.04, installs uv, OpenShell, Node, and NemoClaw. If NemoClaw reports a cgroup/Docker config warning, run on your **host** (outside the container): `nemoclaw setup-spark`, then run `npm run do-it-all:docker` again. After the sandbox exists, connect with `nemoclaw my-assistant connect` and run `openclaw 1claw status` inside.
+Then connect with `openshell sandbox connect my-assistant` or `docker exec -it <container> bash` and run `openclaw 1claw status` inside.
 
 ---
 
@@ -124,51 +125,31 @@ The same commands are available inside OpenClaw as `openclaw 1claw <command>` on
 
 ---
 
-## 5. Spin up NemoClaw and test 1claw inside the sandbox
+## 5. Run NemoClaw in Docker and test 1claw inside the sandbox
 
-To run the agent inside a real NemoClaw sandbox and use `openclaw 1claw` there:
+To run the agent inside a NemoClaw sandbox and use `openclaw 1claw` there:
 
-### Prerequisites (host)
+### One-shot setup (recommended)
 
-- **Linux** (Ubuntu 22.04 LTS or later recommended)
-- **Docker** installed and running
-- **OpenShell**: `uv tool install -U openshell` — [docs](https://docs.nvidia.com/openshell/latest/)
-- **NemoClaw**: clone and run the installer — [quickstart](https://docs.nvidia.com/nemoclaw/latest/get-started/quickstart.html)
+On your Mac, from the **1claw-nemoclaw** repo root:
 
 ```bash
-# Install OpenShell
-uv tool install -U openshell
-
-# Install NemoClaw (creates a sandbox and installs OpenClaw inside it)
-git clone https://github.com/NVIDIA/NemoClaw.git
-cd NemoClaw
-./install.sh
-# or: curl -fsSL https://nvidia.com/nemoclaw.sh | bash
+openshell gateway start --plaintext   # one-time, on Mac
+npm run setup:docker
 ```
 
-### One-shot script (from this repo)
+This installs dependencies in a container, creates the sandbox, applies the 1claw policy, installs the 1claw plugin, and optionally installs OpenClaw skills from `config/skills-to-install.txt`. Then connect (see README Path 1 and Path 2).
 
-From the **1claw-nemoclaw** repo root, run:
+### Optional: interactive Docker shell
+
+For manual steps (e.g. without using the one-shot setup):
 
 ```bash
-chmod +x scripts/spin-up-nemoclaw.sh
-./scripts/spin-up-nemoclaw.sh
+npm run nemoclaw:interactive
+# Inside container: register gateway, create sandbox, etc. See README.
 ```
 
-Optionally set the sandbox name (default is `my-assistant`):
-
-```bash
-SANDBOX_NAME=my-1claw-test ./scripts/spin-up-nemoclaw.sh
-```
-
-The script will:
-
-1. Check that `openshell`, `nemoclaw`, and `docker` are available (and print install commands if not).
-2. If no sandbox exists, prompt to run `nemoclaw setup` to create one.
-3. Apply **config/1claw-openshell-policy.yaml** to the sandbox so the agent can reach 1claw (and NVIDIA inference, npm, etc.).
-4. Print **next steps**: how to get the 1claw plugin into the sandbox and how to connect and test.
-
-### After the script: get the plugin in and connect
+### After setup: get the plugin in (if not using setup:docker)
 
 You need the 1claw OpenClaw plugin **inside** the sandbox and registered in OpenClaw’s config.
 
@@ -249,4 +230,4 @@ openclaw 1claw ls
 | `scripts/test-openshell-policy.sh` | Validates policy YAML. |
 | `scripts/test-blueprint.sh` | Blueprint with `--skip-apply`. |
 | `scripts/test-plugin-runner.mjs` | Invokes the TS plugin via tsx for local testing. |
-| `scripts/spin-up-nemoclaw.sh` | Checks prereqs, applies 1claw policy, prints steps to test inside NemoClaw. |
+| `scripts/setup-nemoclaw-in-docker.sh` | One-shot Docker setup: sandbox, policy, 1claw plugin, optional skills. |
