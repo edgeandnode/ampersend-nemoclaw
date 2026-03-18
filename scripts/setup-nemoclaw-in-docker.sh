@@ -25,6 +25,21 @@ if [[ -z "$NVIDIA_API_KEY" ]]; then
   exit 1
 fi
 
+# Check if gateway is running before we start
+if ! docker ps --format '{{.Names}}' 2>/dev/null | grep -q "openshell-cluster-openshell"; then
+  echo "WARNING: OpenShell gateway does not appear to be running."
+  echo "The setup will wait up to 90s for the gateway, but it will fail without one."
+  echo ""
+  echo "Start the gateway first with:"
+  echo "  npm run gateway:start"
+  echo ""
+  read -r -p "Continue anyway? [y/N] " response
+  if [[ ! "$response" =~ ^[Yy]$ ]]; then
+    echo "Aborted. Start the gateway, then re-run: npm run setup:docker"
+    exit 1
+  fi
+fi
+
 echo "=============================================="
 echo "  Path 1 in Docker (one-shot)"
 echo "=============================================="
@@ -32,7 +47,11 @@ echo "  Sandbox name: $SANDBOX_NAME"
 echo "  Repo:         $REPO_ROOT"
 echo ""
 
+# Remove any stale container with the same name
+docker rm -f 1claw-setup 2>/dev/null || true
+
 docker run --rm \
+  --name 1claw-setup \
   --cgroupns=host \
   -v "/var/run/docker.sock:/var/run/docker.sock" \
   -v "$REPO_ROOT:/workspace/1claw-nemoclaw:ro" \
@@ -91,15 +110,7 @@ docker run --rm \
       exit 1
     fi
 
-    echo "[5/8] Creating sandbox $SANDBOX_NAME (from openclaw community image)..."
-    if openshell sandbox list 2>/dev/null | grep -q "$SANDBOX_NAME"; then
-      echo "  Sandbox $SANDBOX_NAME already exists."
-    else
-      openshell sandbox create --name "$SANDBOX_NAME" --from openclaw
-      openshell policy set --policy /workspace/1claw-nemoclaw/config/1claw-openshell-policy.yaml "$SANDBOX_NAME" 2>/dev/null || true
-    fi
-
-    echo "[6/8] 1claw agent self-enroll (optional)..."
+    echo "[5/8] 1claw agent self-enroll (optional, before sandbox to avoid hanging)..."
     if [[ -z "$ONECLAW_AGENT_ID" && -z "$ONECLAW_API_KEY" && -n "$ONECLAW_HUMAN_EMAIL" ]]; then
       ENROLL_NAME="${ONECLAW_AGENT_NAME:-$SANDBOX_NAME}"
       ENROLL_RESP=$(curl -s -X POST "https://api.1claw.xyz/v1/agents/enroll" \
@@ -119,13 +130,26 @@ docker run --rm \
       echo "  (Set ONECLAW_HUMAN_EMAIL in .env to self-enroll when ONECLAW_AGENT_ID/ONECLAW_API_KEY are not set.)"
     fi
 
-    echo "[7/8] Uploading and installing 1claw plugin..."
-    if [[ -d /workspace/1claw-nemoclaw/config/1claw-plugin ]]; then
-      openshell sandbox upload "$SANDBOX_NAME" /workspace/1claw-nemoclaw/config/1claw-plugin /sandbox/1claw-plugin 2>/dev/null || true
-      printf "openclaw plugins install /sandbox/1claw-plugin 2>/dev/null; exit\n" | openshell sandbox connect "$SANDBOX_NAME" 2>/dev/null || true
-      echo "  1claw plugin uploaded and installed."
+    echo "[6/8] Creating sandbox $SANDBOX_NAME (from openclaw community image)..."
+    if openshell sandbox list 2>/dev/null | grep -q "$SANDBOX_NAME"; then
+      echo "  Sandbox $SANDBOX_NAME already exists."
     else
-      echo "  (config/1claw-plugin not found; skip plugin install)"
+      openshell sandbox create --name "$SANDBOX_NAME" --from openclaw --no-tty -- true
+      openshell policy set --policy /workspace/1claw-nemoclaw/config/1claw-openshell-policy.yaml "$SANDBOX_NAME" 2>/dev/null || true
+    fi
+
+    echo "[7/8] Cloning, building, and installing 1claw plugin..."
+    PLUGIN_DIR="/workspace/1claw-plugin"
+    if git clone --depth 1 https://github.com/1clawAI/1claw-openclaw-plugin.git "$PLUGIN_DIR" 2>/dev/null; then
+      cd "$PLUGIN_DIR"
+      npm install --production 2>/dev/null
+      rm -f .gitignore  # so openshell upload includes node_modules
+      cd /workspace
+      openshell sandbox upload "$SANDBOX_NAME" "$PLUGIN_DIR" /sandbox/1claw-plugin 2>/dev/null || true
+      printf "openclaw plugins install /sandbox/1claw-plugin 2>/dev/null; exit\n" | openshell sandbox connect "$SANDBOX_NAME" 2>/dev/null || true
+      echo "  1claw plugin cloned, built, and installed."
+    else
+      echo "  (Failed to clone 1claw-openclaw-plugin; install manually later — see README.)"
     fi
 
     echo "[8/8] Installing OpenClaw skills (from config/skills-to-install.txt)..."
@@ -151,11 +175,11 @@ docker run --rm \
     echo ""
     echo "=============================================="
     echo "  Setup complete (gateway is plaintext — no TLS cert errors)."
-    echo "  Connect:  docker ps  then  docker exec -it <sandbox-container-id> bash"
+    echo "  Connect:  npm run connect"
+    echo "  Or:       docker exec -it <sandbox-container-id> bash   (see docker ps)"
     echo "  Or:       npm run nemoclaw:interactive   then  nemoclaw '"$SANDBOX_NAME"' connect"
-    echo "  From Mac: openshell gateway add http://127.0.0.1:8080 --local  then  openshell sandbox list"
     echo "=============================================="
   '
 
 echo ""
-echo "Run  docker ps  to find the sandbox container, then  docker exec -it <id> bash  to connect."
+echo "Connect to the sandbox with:  npm run connect"

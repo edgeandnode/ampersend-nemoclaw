@@ -1,9 +1,0 @@
-{
-  "id": "1claw",
-  "name": "1claw",
-  "configSchema": {
-    "type": "object",
-    "additionalProperties": false,
-    "properties": {}
-  }
-}

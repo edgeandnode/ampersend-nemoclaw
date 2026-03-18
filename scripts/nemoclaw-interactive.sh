@@ -47,8 +47,12 @@ echo "  add  \"default-cgroupns-mode\": \"host\"  to daemon.json and restart Doc
 echo "=============================================="
 echo ""
 
+# Remove any stale container with the same name
+docker rm -f 1claw-interactive 2>/dev/null || true
+
 # OpenShell gateway needs host cgroup namespace (k3s inside Docker)
 docker run --rm -it \
+  --name 1claw-interactive \
   --cgroupns=host \
   -v "/var/run/docker.sock:/var/run/docker.sock" \
   -v "$REPO_ROOT:/workspace/1claw-nemoclaw:ro" \
