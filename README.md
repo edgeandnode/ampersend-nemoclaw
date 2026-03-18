@@ -76,13 +76,13 @@ You’re now inside the sandbox.
 ```bash
 export ONECLAW_VAULT_ID="your-vault-id"
 export ONECLAW_AGENT_ID="your-agent-id"
-export ONECLAW_API_KEY="ocv_..."
+export ONECLAW_AGENT_API_KEY="ocv_..."
 openclaw 1claw status
 ```
 
 ### 1.5a Start the OpenClaw TUI
 
-The OpenClaw TUI is a chat interface for the AI agent — it is **not** a shell. Run `openclaw 1claw` commands (enroll, status, etc.) directly in the sandbox shell, not inside the TUI.
+The OpenClaw TUI is a chat interface for the AI agent — it is **not** a shell. The 1claw plugin registers TUI slash commands (`/oneclaw`, `/oneclaw-enroll`, `/oneclaw-list`).
 
 **1. Configure the Anthropic API key** (required for the AI agent):
 
@@ -111,9 +111,20 @@ openclaw tui --token mytoken
 
 **If you don’t have credentials yet (agent self-onboarding):** the agent can self-enroll with 1claw; the API key is emailed to you. Either:
 
-- **During setup:** set `ONECLAW_HUMAN_EMAIL=you@example.com` in `.env` (leave `ONECLAW_AGENT_ID` and `ONECLAW_API_KEY` empty) before running `npm run setup:docker`. The setup script will call the [enroll API](https://docs.1claw.xyz/docs/guides/agent-self-onboarding); check your email for the key, then create a vault and policy in the 1claw dashboard and set the three env vars above.
+- **During setup:** set `ONECLAW_HUMAN_EMAIL=you@example.com` in `.env` (leave `ONECLAW_AGENT_ID` and `ONECLAW_AGENT_API_KEY` empty) before running `npm run setup:docker`. The setup script will call the [enroll API](https://docs.1claw.xyz/docs/guides/agent-self-onboarding); check your email for the key, then create a vault and policy in the 1claw dashboard and set the three env vars above.
 
-- **Inside the sandbox:** run `openclaw 1claw enroll --email you@example.com`. Follow the printed steps: check email, create vault and policy in the dashboard, then `export ONECLAW_AGENT_ID=... ONECLAW_API_KEY=... ONECLAW_VAULT_ID=...`.
+- **Inside the sandbox (curl):** run:
+  ```bash
+  curl -s -X POST "https://api.1claw.xyz/v1/agents/enroll" \
+    -H "Content-Type: application/json" \
+    -d ‘{"name":"my-assistant","human_email":"you@example.com","description":"OpenClaw agent"}’
+  ```
+  Check your email for the API key, create a vault and policy in the [1claw dashboard](https://1claw.xyz), then:
+  ```bash
+  export ONECLAW_AGENT_ID="..." ONECLAW_AGENT_API_KEY="ocv_..." ONECLAW_VAULT_ID="..."
+  ```
+
+- **In the TUI:** use the `/oneclaw-enroll you@example.com` slash command.
 
 `openclaw tui` is the chat UI. This repo is mounted at `/workspace/1claw-nemoclaw`.
 
@@ -138,7 +149,7 @@ npm run connect
 openclaw plugins install /sandbox/1claw-plugin
 export ONECLAW_VAULT_ID="your-vault-id"
 export ONECLAW_AGENT_ID="your-agent-id"
-export ONECLAW_API_KEY="ocv_..."
+export ONECLAW_AGENT_API_KEY="ocv_..."
 openclaw 1claw status
 ```
 
@@ -253,7 +264,7 @@ If you want to run `nemoclaw my-assistant connect` from the Mac instead of `dock
 
 **Without the sandbox (local):** From the repo, set `.env` with 1claw credentials, then run `npm test` (policy, blueprint, plugin).
 
-**Inside the sandbox (full flow):** (1) On your Mac: `npm run gateway:start`, then `npm run setup:docker`. (2) Connect: `npm run connect`. (3) In the sandbox, set `ONECLAW_VAULT_ID`, `ONECLAW_AGENT_ID`, `ONECLAW_API_KEY`, then run `openclaw 1claw status`, `openclaw 1claw ls`, `openclaw 1claw fetch path/to/secret`. For the TUI, see step 1.5a. If the openclaw image does not include the 1claw plugin, see [Testing guide](scripts/README-TESTING.md).
+**Inside the sandbox (full flow):** (1) On your Mac: `npm run gateway:start`, then `npm run setup:docker`. (2) Connect: `npm run connect`. (3) In the sandbox, set `ONECLAW_VAULT_ID`, `ONECLAW_AGENT_ID`, `ONECLAW_AGENT_API_KEY`, then run `openclaw 1claw status`, `openclaw 1claw ls`, `openclaw 1claw fetch path/to/secret`. For the TUI, see step 1.5a. If the openclaw image does not include the 1claw plugin, see [Testing guide](scripts/README-TESTING.md).
 
 ---
 
@@ -268,7 +279,7 @@ If you want to run `nemoclaw my-assistant connect` from the Mac instead of `dock
 | `npm run nemoclaw:interactive` | Start an interactive Docker shell for manual NemoClaw steps. |
 | `npm test` | Run tests (policy, blueprint, plugin). |
 
-**.env** — Copy `.env.example` to `.env` and set `ONECLAW_VAULT_ID`, `ONECLAW_AGENT_ID`, `ONECLAW_API_KEY` for 1claw. Used in the sandbox and by tests.
+**.env** — Copy `.env.example` to `.env` and set `ONECLAW_VAULT_ID`, `ONECLAW_AGENT_ID`, `ONECLAW_AGENT_API_KEY` for 1claw. Used in the sandbox and by tests.
 
 ---
 
