@@ -17,7 +17,7 @@ ampersend enables autonomous agent payments using smart account wallets and the 
 ### 1. Configure
 
 ```bash
-git clone https://github.com/kmjones1979/ampersend-nemoclaw.git
+git clone https://github.com/edgeandnode/ampersend-nemoclaw.git
 cd ampersend-nemoclaw
 npm install
 cp .env.example .env   # then edit .env
@@ -107,6 +107,60 @@ ampersend fetch --inspect <url>
 ```
 
 All commands return JSON — check the `ok` field. For `fetch`, successful responses include `data.status`, `data.body`, and `data.payment` (when a payment was made).
+
+### 7. Add x402 payment endpoints to the network policy
+
+The OpenShell sandbox blocks all outbound traffic by default. The included policy (`config/ampersend-openshell-policy.yaml`) already allows `api.ampersend.ai` (for setup/auth), Base RPC (for on-chain signing), and `httpay.xyz` (as a sample x402 server). **If your agent needs to pay a different x402-enabled server, you must add it to the policy.**
+
+Open `config/ampersend-openshell-policy.yaml` and add an entry under `network_policies`. For example, to allow `api.example.com`:
+
+```yaml
+  my_x402_server:
+    name: my-x402-server
+    endpoints:
+      - host: api.example.com
+        port: 443
+        protocol: rest
+        tls: terminate
+        enforcement: enforce
+        access: read-write
+    binaries:
+      - path: /usr/bin/node
+      - path: /usr/bin/npx
+      - path: /sandbox/.local/bin/**
+```
+
+Or add the host to the existing `x402_endpoints` block:
+
+```yaml
+  x402_endpoints:
+    name: x402-payment-endpoints
+    endpoints:
+      - host: httpay.xyz
+        port: 443
+        protocol: rest
+        tls: terminate
+        enforcement: enforce
+        access: read-write
+      - host: api.example.com        # ← add your host here
+        port: 443
+        protocol: rest
+        tls: terminate
+        enforcement: enforce
+        access: read-write
+    binaries:
+      - path: /usr/bin/node
+      - path: /usr/bin/npx
+      - path: /sandbox/.local/bin/**
+```
+
+Then hot-reload the policy on the live sandbox (no restart needed):
+
+```bash
+openshell policy set my-assistant --policy config/ampersend-openshell-policy.yaml
+```
+
+> **Note:** The `filesystem_policy.read_only` list must include all paths from the base image (e.g. `/app`, `/var/log` for OpenClaw). If you see an error like `"path '/app' cannot be removed on a live sandbox"`, add the missing path to the `read_only` list and retry.
 
 ---
 
