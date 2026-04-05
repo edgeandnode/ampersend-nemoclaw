@@ -19,9 +19,16 @@ fi
 
 # Use venv if needed (avoids externally-managed-environment on macOS/Homebrew)
 VENV_DIR="$REPO_ROOT/.venv"
+
+# Detect stale venv (e.g. repo was moved/renamed and shebangs point to old path)
+if [[ -d "$VENV_DIR" ]] && ! "$VENV_DIR/bin/python" --version &>/dev/null; then
+  echo "Removing stale venv (interpreter not found — repo may have moved)..."
+  rm -rf "$VENV_DIR"
+fi
+
 if ! python3 -c "import httpx, typer, yaml, rich" 2>/dev/null; then
   echo "Creating venv and installing Python deps..."
-  python3 -m venv "$VENV_DIR" 2>/dev/null || true
+  python3 -m venv "$VENV_DIR"
   "$VENV_DIR/bin/pip" install -r "$REPO_ROOT/requirements.txt" -q
 fi
 if [[ -x "$VENV_DIR/bin/python" ]] && "$VENV_DIR/bin/python" -c "import httpx, typer, yaml, rich" 2>/dev/null; then

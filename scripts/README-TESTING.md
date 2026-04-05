@@ -197,11 +197,15 @@ openclaw ampersend status
 
 | Issue | What to check |
 |-------|----------------|
-| `ampersend: command not found` | Install: `npm install -g @ampersend_ai/ampersend-sdk@0.0.16` |
+| `ampersend: command not found` | In sandbox: `npm install -g @ampersend_ai/ampersend-sdk@0.0.16 --prefix /sandbox/.local --ignore-scripts && chmod +x /sandbox/.local/bin/ampersend`. Locally: `npm install -g @ampersend_ai/ampersend-sdk@0.0.16` |
 | `ampersend not configured` | Run: `ampersend setup start --name <agent-name>`, approve, then `ampersend setup finish` |
+| `npm install -g` EACCES in sandbox | Sandbox runs as non-root. Use `--prefix /sandbox/.local --ignore-scripts` |
+| gRPC `Unimplemented` / CrashLoopBackOff | openshell CLI too old. Upgrade: `uv tool install -U openshell` (need >= 0.0.20) |
+| Docker disk full / image GC loop | Run `docker system prune -a --volumes -f` to free space |
 | `openshell: command not found` | Policy file test still passes; install OpenShell to apply policy or run sandbox. |
 | `tsx` not found when running plugin test | Run `npm install` (tsx is a devDependency) or `npx tsx scripts/test-plugin-runner.ts status`. |
 | Python `ModuleNotFoundError` | Run `pip install -r requirements.txt`. |
+| Stale venv / `bad interpreter` | Repo was moved. Run `rm -rf .venv` and retry. |
 
 ---
 
@@ -213,6 +217,7 @@ openclaw ampersend status
 | `config/nemoclaw-ampersend-blueprint.py` | NemoClaw blueprint: resolve -> plan -> apply -> validate. |
 | `config/openclaw-ampersend-plugin.ts` | OpenClaw plugin: `openclaw ampersend status/setup/fetch/inspect/...` |
 | `config/ampersend-plugin/` | Plugin bundle uploaded into sandboxes. |
+| `config/ampersend-sandbox-init.sh` | Shell init for sandboxes; auto-installs ampersend CLI on login. |
 | `scripts/test-all.sh` | Runs policy + blueprint (dry-run) + plugin status. |
 | `scripts/test-openshell-policy.sh` | Validates policy YAML. |
 | `scripts/test-blueprint.sh` | Blueprint with `--skip-apply`. |

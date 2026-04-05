@@ -10,8 +10,9 @@ ampersend enables autonomous agent payments using smart account wallets and the 
 
 ### Prerequisites
 
-* **Docker Desktop** running on your Mac
+* **Docker Desktop** running on your Mac (with at least **5 GB free disk** — see Troubleshooting)
 * **NVIDIA API key** — get one at <https://build.nvidia.com/settings/api-keys>
+* **openshell >= 0.0.20** — install with `uv tool install -U openshell` (older versions cause sandbox crashes)
 
 ### 1. Configure
 
@@ -172,10 +173,19 @@ nemoclaw my-assistant connect
 
 ### 1.5 Use ampersend in the sandbox
 
-You're now inside the sandbox. Install the CLI and configure:
+You're now inside the sandbox. If you used `npm run setup:docker`, the ampersend CLI is already installed and in PATH. Otherwise install it manually:
 
 ```bash
-npm install -g @ampersend_ai/ampersend-sdk@0.0.16
+# The sandbox runs as non-root, so install to a local prefix.
+# --ignore-scripts skips native builds (nodejs.org is blocked by the network policy).
+npm install -g @ampersend_ai/ampersend-sdk@0.0.16 --prefix /sandbox/.local --ignore-scripts
+chmod +x /sandbox/.local/bin/ampersend
+export PATH="/sandbox/.local/bin:$PATH"
+```
+
+Then configure:
+
+```bash
 ampersend setup start --name "my-assistant"
 # Approve in browser, then:
 ampersend setup finish
@@ -249,8 +259,12 @@ ampersend lets agents make payments via smart account wallets with automatic x40
 
 ### Install the CLI (inside the sandbox)
 
+If you used `npm run setup:docker`, the CLI is already installed. Otherwise:
+
 ```bash
-npm install -g @ampersend_ai/ampersend-sdk@0.0.16
+npm install -g @ampersend_ai/ampersend-sdk@0.0.16 --prefix /sandbox/.local --ignore-scripts
+chmod +x /sandbox/.local/bin/ampersend
+export PATH="/sandbox/.local/bin:$PATH"
 ```
 
 ### Configure
@@ -296,6 +310,12 @@ ampersend config set "0xagentKey:::0xagentAccount"
 
 ## Troubleshooting
 
+- **Sandbox stuck in "Provisioning" or CrashLoopBackOff with gRPC "Unimplemented"**
+  This is an openshell version mismatch. The CLI must be >= 0.0.20 to work with the current gateway image. Check with `openshell --version`. Upgrade: `uv tool install -U openshell` (then ensure `~/.local/bin` is in your PATH). After upgrading, destroy and restart: `openshell gateway destroy && openshell gateway start --plaintext`.
+
+- **Docker disk full / sandbox image keeps getting garbage-collected**
+  If Kubernetes disk usage exceeds 85%, it garbage-collects the 1.4 GB OpenClaw image in a loop. Free space: `docker system prune -a --volumes -f` (removes unused images, build cache, volumes). The setup script checks for this and warns you.
+
 - **"Gateway failed to start"**
   Exit the container. On your Mac: Docker Desktop -> Settings -> Docker Engine. Add `"default-cgroupns-mode": "host"` to the JSON. Apply & Restart.
 
@@ -312,7 +332,13 @@ ampersend config set "0xagentKey:::0xagentAccount"
   If Docker fails with `docker-credential-desktop: signal: killed`, open `~/.docker/config.json` and change `"credsStore": "desktop"` to `"credsStore": ""`.
 
 - **`ampersend` command not found inside sandbox**
-  Install: `npm install -g @ampersend_ai/ampersend-sdk@0.0.16`
+  If you used `npm run setup:docker`, reconnect — the CLI auto-installs on login. Otherwise install manually: `npm install -g @ampersend_ai/ampersend-sdk@0.0.16 --prefix /sandbox/.local --ignore-scripts && chmod +x /sandbox/.local/bin/ampersend && export PATH="/sandbox/.local/bin:$PATH"`
+
+- **`npm install -g` EACCES / permission denied inside sandbox**
+  The sandbox runs as non-root user `sandbox`. Use `--prefix /sandbox/.local` instead of global install. Add `--ignore-scripts` to skip native builds (the network policy blocks `nodejs.org`).
+
+- **Stale Python venv (`bad interpreter` error in test-blueprint.sh)**
+  If the repo was moved or renamed, delete the old venv: `rm -rf .venv` and re-run `npm test`.
 
 ---
 
@@ -324,6 +350,7 @@ ampersend config set "0xagentKey:::0xagentAccount"
 | **config/openclaw-ampersend-plugin.ts** | OpenClaw plugin: `openclaw ampersend status`, `setup`, `fetch`, `inspect`, etc. |
 | **config/nemoclaw-ampersend-blueprint.py** | Blueprint to apply ampersend policy to a sandbox. |
 | **config/ampersend-plugin/** | Plugin bundle uploaded into sandboxes. |
+| **config/ampersend-sandbox-init.sh** | Shell init sourced on login; auto-installs ampersend CLI if missing. |
 | **config/skills-to-install.txt** | Skills to auto-install during setup. |
 
 ---

@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Run Path 1 (README) inside Docker in one go: install, start gateway (plaintext to avoid TLS cert issues), create sandbox.
 # Requires: Docker, and NVIDIA_API_KEY in .env (or env).
-# After this, connect with: docker exec -it <sandbox-container> bash  (see docker ps)
+# After this, connect with: openshell sandbox connect my-assistant
 
 set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SANDBOX_NAME="${SANDBOX_NAME:-my-assistant}"
+MIN_OPENSHELL_VERSION="0.0.20"
 
 if ! command -v docker &>/dev/null; then
   echo "Docker is required."
@@ -22,6 +23,40 @@ fi
 if [[ -z "$NVIDIA_API_KEY" ]]; then
   echo "Add NVIDIA_API_KEY to .env (or export it), then re-run."
   echo "Get a key at https://build.nvidia.com/settings/api-keys"
+  exit 1
+fi
+
+# Check Docker disk space — the OpenClaw image is ~1.5 GB and setup needs headroom.
+DOCKER_DATA_USAGE=$(docker system df --format '{{.Size}}' 2>/dev/null | head -1)
+DOCKER_DISK_FREE=$(docker system info --format '{{json .}}' 2>/dev/null | python3 -c '
+import sys, json
+try:
+    info = json.load(sys.stdin)
+    total = info.get("MemTotal", 0)
+except: pass
+' 2>/dev/null || true)
+
+DOCKER_RECLAIMABLE=$(docker system df --format '{{.Reclaimable}}' 2>/dev/null | head -4 | paste -sd+ - | bc 2>/dev/null || echo "0")
+IMAGE_SIZE=$(docker system df --format '{{.Size}}' 2>/dev/null | head -1)
+echo "Checking Docker disk..."
+echo "  Images: $IMAGE_SIZE"
+
+RECLAIMABLE_BYTES=$(docker system df -v --format '{{.Reclaimable}}' 2>/dev/null | head -1 || echo "0")
+TOTAL_RECLAIMABLE=$(docker system df --format '{{.Reclaimable}}' 2>/dev/null | tr '\n' ', ')
+echo "  Reclaimable: $TOTAL_RECLAIMABLE"
+
+# Warn if Docker is using a lot of space and offer to prune
+DISK_USAGE_PCT=$(docker system info --format '{{json .DriverStatus}}' 2>/dev/null | \
+  python3 -c 'import sys,json; ds=json.load(sys.stdin); pct=[v for k,v in ds if "percentage" in k.lower()]; print(pct[0].rstrip("%") if pct else "0")' 2>/dev/null || echo "0")
+if [[ "${DISK_USAGE_PCT%%.*}" -ge 80 ]] 2>/dev/null; then
+  echo ""
+  echo "  WARNING: Docker disk usage is at ${DISK_USAGE_PCT}%."
+  echo "  The OpenClaw sandbox image is ~1.5 GB. If disk is too full, Kubernetes"
+  echo "  will garbage-collect images in a loop and the sandbox will never start."
+  echo ""
+  echo "  Run 'docker system prune -a --volumes -f' to free space, then re-run."
+  echo "  (This removes unused images, containers, volumes, and build cache.)"
+  echo ""
   exit 1
 fi
 
@@ -96,8 +131,17 @@ docker run --rm \
     fi
 
     echo "[6/7] Installing ampersend CLI and uploading plugin..."
-    # Install ampersend CLI globally in the sandbox
-    printf "npm install -g @ampersend_ai/ampersend-sdk@0.0.16 2>/dev/null || true; exit\n" | openshell sandbox connect "$SANDBOX_NAME" 2>/dev/null || true
+    # The sandbox runs as non-root user "sandbox", so npm install -g to /usr/lib fails.
+    # Install to /sandbox/.local instead, and --ignore-scripts avoids node-gyp failures
+    # (nodejs.org is blocked by the sandbox network policy; JS fallbacks work fine).
+    INSTALL_CMD="npm install -g @ampersend_ai/ampersend-sdk@0.0.16 --prefix /sandbox/.local --ignore-scripts 2>&1 && chmod +x /sandbox/.local/bin/ampersend 2>/dev/null"
+    printf "%s; exit\n" "$INSTALL_CMD" | openshell sandbox connect "$SANDBOX_NAME" 2>/dev/null || true
+
+    # Upload the init script that adds PATH and auto-installs on future logins
+    openshell sandbox upload "$SANDBOX_NAME" /workspace/ampersend-nemoclaw/config/ampersend-sandbox-init.sh /sandbox/.ampersend-init.sh 2>/dev/null || true
+    printf "grep -q ampersend-init.sh ~/.bashrc 2>/dev/null || echo \". /sandbox/.ampersend-init.sh\" >> ~/.bashrc; exit\n" \
+      | openshell sandbox connect "$SANDBOX_NAME" 2>/dev/null || true
+    echo "  ampersend CLI installed and PATH configured."
 
     if [[ -d /workspace/ampersend-nemoclaw/config/ampersend-plugin ]]; then
       openshell sandbox upload "$SANDBOX_NAME" /workspace/ampersend-nemoclaw/config/ampersend-plugin /sandbox/ampersend-plugin 2>/dev/null || true
@@ -129,10 +173,10 @@ docker run --rm \
 
     echo ""
     echo "=============================================="
-    echo "  Setup complete (gateway is plaintext — no TLS cert errors)."
-    echo "  Connect:  docker ps  then  docker exec -it <sandbox-container-id> bash"
-    echo "  Or:       npm run nemoclaw:interactive   then  nemoclaw '"$SANDBOX_NAME"' connect"
-    echo "  From Mac: openshell gateway add http://127.0.0.1:8080 --local  then  openshell sandbox list"
+    echo "  Setup complete."
+    echo ""
+    echo "  Connect from your Mac:"
+    echo "    openshell sandbox connect '"$SANDBOX_NAME"'"
     echo ""
     echo "  Inside the sandbox:"
     echo "    ampersend config status"
@@ -142,4 +186,4 @@ docker run --rm \
   '
 
 echo ""
-echo "Run  docker ps  to find the sandbox container, then  docker exec -it <id> bash  to connect."
+echo "Done. Connect with:  openshell sandbox connect $SANDBOX_NAME"
