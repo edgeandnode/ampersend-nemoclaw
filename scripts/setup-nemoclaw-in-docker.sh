@@ -126,7 +126,8 @@ docker run --rm \
     if openshell sandbox list 2>/dev/null | grep -q "$SANDBOX_NAME"; then
       echo "  Sandbox $SANDBOX_NAME already exists."
     else
-      openshell sandbox create --name "$SANDBOX_NAME" --from openclaw
+      # --no-tty prevents the create command from opening an interactive shell
+      openshell sandbox create --name "$SANDBOX_NAME" --from openclaw --no-tty -- exit
       openshell policy set --policy /workspace/ampersend-nemoclaw/config/ampersend-openshell-policy.yaml "$SANDBOX_NAME" 2>/dev/null || true
     fi
 
@@ -137,9 +138,10 @@ docker run --rm \
     INSTALL_CMD="npm install -g @ampersend_ai/ampersend-sdk@0.0.16 --prefix /sandbox/.local --ignore-scripts 2>&1 && chmod +x /sandbox/.local/bin/ampersend 2>/dev/null"
     printf "%s; exit\n" "$INSTALL_CMD" | openshell sandbox connect "$SANDBOX_NAME" 2>/dev/null || true
 
-    # Upload the init script that adds PATH and auto-installs on future logins
-    openshell sandbox upload "$SANDBOX_NAME" /workspace/ampersend-nemoclaw/config/ampersend-sandbox-init.sh /sandbox/.ampersend-init.sh 2>/dev/null || true
-    printf "grep -q ampersend-init.sh ~/.bashrc 2>/dev/null || echo \". /sandbox/.ampersend-init.sh\" >> ~/.bashrc; exit\n" \
+    # Upload the init script that adds PATH and auto-installs on future logins.
+    # "upload" copies into a directory, so upload to /sandbox/ then rename.
+    openshell sandbox upload "$SANDBOX_NAME" /workspace/ampersend-nemoclaw/config/ampersend-sandbox-init.sh /sandbox/ 2>/dev/null || true
+    printf "mv /sandbox/ampersend-sandbox-init.sh /sandbox/.ampersend-init.sh 2>/dev/null; chmod +x /sandbox/.ampersend-init.sh 2>/dev/null; grep -q ampersend-init.sh ~/.bashrc 2>/dev/null || echo \". /sandbox/.ampersend-init.sh\" >> ~/.bashrc; exit\n" \
       | openshell sandbox connect "$SANDBOX_NAME" 2>/dev/null || true
     echo "  ampersend CLI installed and PATH configured."
 
